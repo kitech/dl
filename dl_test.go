@@ -3,7 +3,7 @@ package dl_test
 import (
 	"testing"
 
-	"github.com/gonuts/dl"
+	"github.com/kitech/dl"
 )
 
 func TestDlOpenLibc(t *testing.T) {

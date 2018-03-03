@@ -17,8 +17,8 @@ const (
 	Now      Flags = C.RTLD_NOW
 	Global   Flags = C.RTLD_GLOBAL
 	Local    Flags = C.RTLD_LOCAL
-	NoLoad   Flags = C.RTLD_NOLOAD
-	NoDelete Flags = C.RTLD_NODELETE
+	//NoLoad   Flags = C.RTLD_NOLOAD
+	//NoDelete Flags = C.RTLD_NODELETE
 	// First Flags = C.RTLD_FIRST
 )
 
