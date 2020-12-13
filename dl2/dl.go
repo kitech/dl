@@ -8,30 +8,33 @@ package dl
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <dlfcn.h>
 
-// 由于pad有问题，所有的函数都打包成一个void*结构体参数，一个返回值指针
-int goasmcc_dlopen(struct {void *p0; void* r;} *ax) {
-  struct {char* a0; int a1;}* argv = ax->p0;
-  ax->r = dlopen(argv->a0, argv->a1);
-  return 0; // just error code
+// 由于pad有问题，所有的函数都打包成一个void*结构体参数，返回值也打包在这个结构体中
+int goasmcc_dlopen(struct {char *a0; int a1; void* ret;} *ax) {
+   ax->ret = dlopen(ax->a0, ax->a1);
+   return 0; // just error code
 }
-int goasmcc_dlclose(struct {void* p0; int r; } *ax) {
-  struct {void* a0;}* argv = ax->p0;
-  ax->r = dlclose(argv->a0);
+int goasmcc_dlclose(struct {void* a0; int ret; } *ax) {
+    ax->ret = dlclose(ax->a0);
   return 0;
 }
-int goasmcc_dlsym(struct {void* p0; void* r; } *ax) {
-  struct {void* a0; char* a1;}* argv = ax->p0;
-  ax->r = dlsym(argv->a0, argv->a1);
+int goasmcc_dlsym(struct {void* a0; char* a1; void* ret; } *ax) {
+  ax->ret = dlsym(ax->a0, ax->a1);
   return 0;
 }
-int goasmcc_dlerror(char** sret) {
-  *sret = dlerror();
+int goasmcc_dlerror(struct {char* ret;} *ax) {
+  ax->ret = dlerror();
   return 0;
 }
 
-int goasmcc_empty() { return 0; }
+int goasmcc_empty() {
+  char buf[100];
+  buf[0] = 12;
+  //sprintf(buf, "ttt %d", 999);
+  return 0;
+}
 */
 import "C"
 
@@ -39,7 +42,7 @@ import (
 	"fmt"
 	"unsafe"
 
-	"github.com/LaevusDexter/asmcgocall"
+	"github.com/kitech/dl/asmcgocall"
 )
 
 //
@@ -55,28 +58,14 @@ const (
 	// First Flags = C.RTLD_FIRST
 )
 
-var openFunc = func() (result func(unsafe.Pointer) unsafe.Pointer) {
-	asmcgocall.Register(C.goasmcc_dlopen, &result)
-	return
-}()
-var closeFunc = func() (result func(unsafe.Pointer) C.int) {
-	asmcgocall.Register(C.goasmcc_dlclose, &result)
-	return
-}()
-var symFunc = func() (result func(unsafe.Pointer) unsafe.Pointer) {
-	asmcgocall.Register(C.goasmcc_dlsym, &result)
-	return
-}()
-var errorFunc = func() (result func() *C.char) {
-	asmcgocall.Register(C.goasmcc_dlerror, &result)
-	return
-}()
-var EmptyFunc = func() (result func()) {
-	asmcgocall.Register(C.goasmcc_empty, &result)
-	return
-}()
+// return func(unsafe.Pointer)
+var openFunc = asmcgocall.Register2(C.goasmcc_dlopen)
+var closeFunc = asmcgocall.Register2(C.goasmcc_dlclose)
+var symFunc = asmcgocall.Register2(C.goasmcc_dlsym)
+var errorFunc = asmcgocall.Register2(C.goasmcc_dlerror)
+var EmptyAsmcc = asmcgocall.Register2(C.goasmcc_empty)
 
-func EmptyFunc2() { C.goasmcc_empty() }
+func EmptyCgocc() { C.goasmcc_empty() }
 
 type Handle struct {
 	c unsafe.Pointer
@@ -86,10 +75,12 @@ func Open(fname string, flags Flags) (Handle, error) {
 	c_str := (*C.char)(unsafe.Pointer(&[]byte(fname)[0]))
 
 	var argv = struct {
-		p0 *C.char
-		p1 C.int
-	}{c_str, C.int(flags)}
-	h := openFunc(unsafe.Pointer(&argv))
+		p0  *C.char
+		p1  C.int
+		ret unsafe.Pointer
+	}{c_str, C.int(flags), nil}
+	openFunc((unsafe.Pointer(&argv)))
+	h := argv.ret
 	if h == nil {
 		err := fmt.Errorf("dl: %s", DLError())
 		return Handle{}, err
@@ -102,8 +93,12 @@ func (h Handle) Close() error {
 	if h.c == nil {
 		return nil
 	}
-	var argv = struct{ a0 unsafe.Pointer }{h.c}
-	o := closeFunc(unsafe.Pointer(&argv))
+	var argv = struct {
+		a0  unsafe.Pointer
+		ret C.int
+	}{h.c, 0}
+	closeFunc(unsafe.Pointer(&argv))
+	o := argv.ret
 	if o != C.int(0) {
 		err := fmt.Errorf("dl: %s", DLError())
 		return err
@@ -120,10 +115,13 @@ func (h Handle) Symbol(symbol string) (uintptr, error) {
 	c_sym := (*C.char)(unsafe.Pointer(&[]byte(symbol)[0]))
 
 	var argv = struct {
-		a0 unsafe.Pointer
-		a1 *C.char
-	}{h.c, c_sym}
-	c_addr := symFunc(unsafe.Pointer(&argv))
+		a0  unsafe.Pointer
+		a1  *C.char
+		ret unsafe.Pointer
+	}{h.c, c_sym, nil}
+
+	symFunc(unsafe.Pointer(&argv))
+	c_addr := argv.ret
 	if c_addr == nil {
 		err := fmt.Errorf("dl: %s", DLError())
 		return 0, err
@@ -133,7 +131,9 @@ func (h Handle) Symbol(symbol string) (uintptr, error) {
 
 func (h Handle) DLError() string { return DLError() }
 func DLError() string {
-	c_err := errorFunc()
+	var argv = struct{ ret *C.char }{nil}
+	errorFunc(unsafe.Pointer(&argv))
+	c_err := argv.ret
 	if c_err == nil {
 		return ""
 	}

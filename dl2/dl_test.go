@@ -82,13 +82,13 @@ func BenchmarkDlError(b *testing.B) {
 
 func BenchmarkAsmccEmpty(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		dl.EmptyFunc()
+		dl.EmptyAsmcc(nil)
 	}
 }
 
 func BenchmarkCgoccEmpty(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		dl.EmptyFunc2()
+		dl.EmptyCgocc()
 	}
 }
 

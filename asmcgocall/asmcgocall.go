@@ -13,6 +13,12 @@ type parameter struct {
 	packedOffset, offset, size uintptr
 }
 
+// 固定签名的实现方式
+func Register2(cfn unsafe.Pointer) (result func(unsafe.Pointer)) {
+	Register(cfn, &result)
+	return
+}
+
 func Register(cfn unsafe.Pointer, caller interface{}) {
 	fn := reflect.TypeOf(caller)
 
@@ -145,29 +151,35 @@ func createProxy(cfn unsafe.Pointer, parameters []parameter) func(args [0]byte) 
 	}
 
 	return func(args [0]byte) (ret [0]byte) {
-		params := parameters
+		//params := parameters
 
 		pargs := unsafe.Pointer(&args)
+		pargs = unsafe.Pointer(*(**byte)(pargs)) // 仅有一个指针参数的限定情况的转换//
 
-		var (
-			p parameter
-			i uintptr
-		)
+		/*
+			var (
+				p parameter
+				i uintptr
+			)
+		*/
 
+		// 不需要 Pack了
 		/*
 			Pack parameters
 		*/
-		for c := 1; c < len(params); c++ {
-			p = params[c]
+		/*
+			for c := 1; c < len(params); c++ {
+				p = params[c]
 
-			if p.offset == p.packedOffset {
-				continue
-			}
+				if p.offset == p.packedOffset {
+					continue
+				}
 
-			for i = 0; i < p.size; i++ {
-				*(*byte)(unsafe.Pointer(uintptr(pargs) + p.packedOffset + i)) = *(*byte)(unsafe.Pointer(uintptr(pargs) + p.offset + i))
+				for i = 0; i < p.size; i++ {
+					*(*byte)(unsafe.Pointer(uintptr(pargs) + p.packedOffset + i)) = *(*byte)(unsafe.Pointer(uintptr(pargs) + p.offset + i))
+				}
 			}
-		}
+		*/
 
 		asmcgocall(cfn, pargs)
 
