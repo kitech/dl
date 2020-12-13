@@ -58,14 +58,8 @@ const (
 	// First Flags = C.RTLD_FIRST
 )
 
-// return func(unsafe.Pointer)
-var openFunc = asmcgocall.Register2(C.goasmcc_dlopen)
-var closeFunc = asmcgocall.Register2(C.goasmcc_dlclose)
-var symFunc = asmcgocall.Register2(C.goasmcc_dlsym)
-var errorFunc = asmcgocall.Register2(C.goasmcc_dlerror)
-var EmptyAsmcc = asmcgocall.Register2(C.goasmcc_empty)
-
-func EmptyCgocc() { C.goasmcc_empty() }
+func EmptyAsmcc(unsafe.Pointer) { asmcgocall.Asmcc(C.goasmcc_empty, nil) }
+func EmptyCgocc()               { C.goasmcc_empty() }
 
 type Handle struct {
 	c unsafe.Pointer
@@ -80,7 +74,6 @@ func Open(fname string, flags Flags) (Handle, error) {
 		ret unsafe.Pointer
 	}{c_str, C.int(flags), nil}
 
-	// openFunc((unsafe.Pointer(&argv)))
 	asmcgocall.Asmcc(C.goasmcc_dlopen, unsafe.Pointer(&argv))
 	h := argv.ret
 	if h == nil {
@@ -99,7 +92,7 @@ func (h Handle) Close() error {
 		a0  unsafe.Pointer
 		ret C.int
 	}{h.c, 0}
-	// closeFunc(unsafe.Pointer(&argv))
+
 	asmcgocall.Asmcc(C.goasmcc_dlclose, unsafe.Pointer(&argv))
 	o := argv.ret
 	if o != C.int(0) {
@@ -123,7 +116,6 @@ func (h Handle) Symbol(symbol string) (uintptr, error) {
 		ret unsafe.Pointer
 	}{h.c, c_sym, nil}
 
-	// symFunc(unsafe.Pointer(&argv))
 	asmcgocall.Asmcc(C.goasmcc_dlsym, unsafe.Pointer(&argv))
 	c_addr := argv.ret
 	if c_addr == nil {
@@ -136,7 +128,7 @@ func (h Handle) Symbol(symbol string) (uintptr, error) {
 func (h Handle) DLError() string { return DLError() }
 func DLError() string {
 	var argv = struct{ ret *C.char }{nil}
-	// errorFunc(unsafe.Pointer(&argv))
+
 	asmcgocall.Asmcc(C.goasmcc_dlerror, unsafe.Pointer(&argv))
 	c_err := argv.ret
 	if c_err == nil {

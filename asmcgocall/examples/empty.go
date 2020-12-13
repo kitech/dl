@@ -12,13 +12,9 @@ void regular_empty() {}
 */
 import "C"
 
-import "github.com/LaevusDexter/asmcgocall"
+import "github.com/kitech/dl/asmcgocall"
 
-var emptyAsmcgocall = func() (result func()) {
-	asmcgocall.Register(C.empty, &result)
-
-	return
-}()
+var emptyAsmcgocall = func() { asmcgocall.Asmcc(C.empty, nil) }
 
 func emptyCgocall() {
 	C.regular_empty()

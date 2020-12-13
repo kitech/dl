@@ -27,15 +27,20 @@ int regular_sum(int p0, int p1, int p2, int p3, int p4) {
 import "C"
 
 import (
-	"github.com/LaevusDexter/asmcgocall"
+	"unsafe"
+
+	"github.com/kitech/dl/asmcgocall"
 )
 
-var sumAsmcgocall = func() (result func(C.int, C.int, C.int, C.int, C.int) C.int) {
-	asmcgocall.Register(C.sum, &result)
+var sumAsmcgocall = func(a0, a1, a2, a3, a4 int) int {
+	argv := struct {
+		a0, a1, a2, a3, a4 C.int
+		r                  C.int
+	}{C.int(a0), C.int(a1), C.int(a2), C.int(a3), C.int(a4), 0}
+	asmcgocall.Asmcc(C.sum, unsafe.Pointer(&argv))
+	return int(argv.r)
+}
 
-	return
-}()
-
-func sumCgocall(p0, p1, p2, p3, p4 C.int) C.int {
-	return C.regular_sum(p0, p1, p2, p3, p4)
+func sumCgocall(p0, p1, p2, p3, p4 C.int) int {
+	return int(C.regular_sum(p0, p1, p2, p3, p4))
 }
