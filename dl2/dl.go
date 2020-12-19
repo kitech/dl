@@ -62,11 +62,13 @@ func EmptyAsmcc(unsafe.Pointer) { asmcgocall.Asmcc(C.goasmcc_empty, nil) }
 func EmptyCgocc()               { C.goasmcc_empty() }
 
 type Handle struct {
-	c unsafe.Pointer
+	fname string
+	c     unsafe.Pointer
 }
 
 func Open(fname string, flags Flags) (Handle, error) {
-	c_str := (*C.char)(unsafe.Pointer(&[]byte(fname)[0]))
+	fname2 := []byte(fname + "\x00")
+	c_str := (*C.char)(unsafe.Pointer(&fname2[0]))
 
 	var argv = struct {
 		p0  *C.char
@@ -81,7 +83,7 @@ func Open(fname string, flags Flags) (Handle, error) {
 		return Handle{}, err
 	}
 	h2 := unsafe.Pointer(uintptr(h))
-	return Handle{h2}, nil
+	return Handle{fname, h2}, nil
 }
 
 func (h Handle) Close() error {
@@ -108,7 +110,8 @@ func (h Handle) Addr() uintptr {
 }
 
 func (h Handle) Symbol(symbol string) (uintptr, error) {
-	c_sym := (*C.char)(unsafe.Pointer(&[]byte(symbol)[0]))
+	sym2 := []byte(symbol + "\x00") // ensure \0
+	c_sym := (*C.char)(unsafe.Pointer(&sym2[0]))
 
 	var argv = struct {
 		a0  unsafe.Pointer
