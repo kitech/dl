@@ -4,6 +4,7 @@ package dl
 // But aims avoid original cgo call to speed up call performance
 
 /*
+#cgo CFLAGS: -D_GNU_SOURCE
 #cgo LDFLAGS: -ldl
 
 #include <stdlib.h>
@@ -26,6 +27,10 @@ int goasmcc_dlsym(struct {void* a0; char* a1; void* ret; } *ax) {
 }
 int goasmcc_dlerror(struct {char* ret;} *ax) {
   ax->ret = dlerror();
+  return 0;
+}
+int goasmcc_dladdr(struct {void* a0; Dl_info* a1; int ret;} *ax) {
+  ax->ret = dladdr(ax->a0, ax->a1);
   return 0;
 }
 
@@ -105,7 +110,7 @@ func (h Handle) Close() error {
 	return nil
 }
 
-func (h Handle) Addr() uintptr {
+func (h Handle) RawAddr() uintptr {
 	return uintptr(h.c)
 }
 
@@ -138,6 +143,39 @@ func DLError() string {
 		return ""
 	}
 	return C.GoString(c_err)
+}
+
+type Dlinfo struct {
+	Fname string
+	Fbase unsafe.Pointer
+	Sname string
+	Saddr unsafe.Pointer
+}
+
+func DlAddr(addr unsafe.Pointer) (res Dlinfo) {
+	var dlainfo C.Dl_info
+
+	var argv = struct {
+		addr unsafe.Pointer
+		info unsafe.Pointer
+		ret  C.int
+	}{addr, unsafe.Pointer(&dlainfo), C.int(0)}
+
+	asmcgocall.Asmcc(C.goasmcc_dladdr, unsafe.Pointer(&argv))
+	rv := int(argv.ret)
+	if rv != 0 {
+		res.Fname = C.GoString(dlainfo.dli_fname)
+		res.Sname = C.GoString(dlainfo.dli_sname)
+		res.Fbase = dlainfo.dli_fbase
+		res.Saddr = dlainfo.dli_saddr
+	}
+	return
+}
+
+// TODO
+func (h Handle) Info() {
+	//C.dlinfo(h.c, 0, nil)
+	panic("not impled")
 }
 
 // /* Portable libltdl versions of the system dlopen() API. */
